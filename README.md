@@ -90,7 +90,10 @@ docker-compose.yml
 3. Run `docker compose up -d`.
 4. Open n8n at `http://localhost:5678`.
 5. Import `workflow/content-repurposer.json`.
-6. Activate only after testing the webhook end-to-end.
+6. Test the transcript service health endpoint.
+7. Import the workflow into n8n.
+8. Test the webhook with a blog URL and a YouTube URL.
+9. Activate only after testing the webhook end-to-end.
 
 ## Roadmap
 
@@ -106,3 +109,32 @@ docker-compose.yml
 - [ ] Centralized error handling
 - [ ] Google Sheets / Telegram output
 - [ ] Automated tests and screenshots
+
+### Test the transcript service
+
+After Docker starts, the transcript service is intentionally internal to the Docker network. To test it directly from the host, temporarily publish port 8000 in docker-compose.
+
+PowerShell health check:
+
+    Invoke-RestMethod http://localhost:8000/health
+
+### Test the n8n webhook
+
+In n8n, import the workflow and use the Webhook node's Test URL.
+
+Example request body:
+
+    {
+      "url": "https://www.youtube.com/watch?v=VIDEO_ID",
+      "tone": "professional"
+    }
+
+Expected response shape:
+
+    {
+      "summary": "...",
+      "linkedin_post": "...",
+      "tweet_thread": ["...", "..."]
+    }
+
+For the YouTube test, use a public video with an accessible transcript. A missing transcript should produce an explicit 422 error rather than silently generating content.
