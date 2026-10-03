@@ -90,10 +90,8 @@ docker-compose.yml
 3. Run `docker compose up -d`.
 4. Open n8n at `http://localhost:5678`.
 5. Import `workflow/content-repurposer.json`.
-6. Test the transcript service health endpoint.
-7. Import the workflow into n8n.
-8. Test the webhook with a blog URL and a YouTube URL.
-9. Activate only after testing the webhook end-to-end.
+6. Test the webhook with a blog URL and a YouTube URL.
+7. Activate only after testing the webhook end-to-end.
 
 ## Roadmap
 
