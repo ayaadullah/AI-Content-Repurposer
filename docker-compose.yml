@@ -9,6 +9,13 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  transcript-service:
+    build:
+      context: ./transcript-service
+    restart: unless-stopped
+    expose:
+      - "8000"
+
   n8n:
     image: n8nio/n8n:latest
     restart: unless-stopped
@@ -26,6 +33,7 @@ services:
       N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
     depends_on:
       - postgres
+      - transcript-service
     volumes:
       - n8n_data:/home/node/.n8n
 
