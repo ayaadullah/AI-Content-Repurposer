@@ -6,7 +6,27 @@ An n8n automation that turns blog articles and YouTube videos into reusable soci
 
 The current workflow accepts a POST request containing a URL and optional tone, extracts the article through Jina AI, normalizes the source, sends it to an LLM, validates the generated X/Twitter thread, and returns structured JSON.
 
-YouTube transcript extraction is isolated as Phase 2.
+YouTube videos are now supported through the self-hosted transcript service in Phase 2.
+
+## Phase 2: YouTube → Social Content
+
+The YouTube branch validates the URL, calls the local FastAPI transcript service, normalizes the transcript into the same source format used by blog articles, and sends it through the existing LLM pipeline.
+
+Supported YouTube URL forms:
+- Standard watch URLs
+- `youtu.be` links
+- Shorts URLs
+- Embed URLs
+
+If a transcript is unavailable, the transcript service returns HTTP 422 instead of generating content from missing source material.
+
+### Local services
+
+```text
+n8n                 http://localhost:5678
+transcript-service  internal Docker network :8000
+PostgreSQL          internal Docker network :5432
+```
 
 ### Request
 
@@ -51,6 +71,10 @@ Respond to Webhook
 
 ```text
 workflow/content-repurposer.json
+transcript-service/app/main.py
+transcript-service/requirements.txt
+transcript-service/Dockerfile
+transcript-service/README.md
 prompts/summary.txt
 prompts/linkedin.txt
 prompts/twitter.txt
@@ -76,7 +100,7 @@ docker-compose.yml
 - [x] Source normalization and content limit
 - [x] LLM JSON generation
 - [x] X/Twitter character validation
-- [ ] Self-hosted YouTube transcript service
+- [x] Self-hosted YouTube transcript service
 - [ ] Long-content chunking
 - [ ] Retry/regeneration for invalid social posts
 - [ ] Centralized error handling
