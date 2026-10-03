@@ -1,5 +1,5 @@
 {
-  "name": "AI Content Repurposer - Phase 1",
+  "name": "AI Content Repurposer - Phase 2",
   "nodes": [
     {
       "parameters": {
@@ -90,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const source = $('Validate Request').first().json;\nconst raw = typeof $json.data === 'string' ? $json.data : JSON.stringify($json);\nconst words = raw.split(/\\s+/).filter(Boolean);\nconst content = words.slice(0,12000).join(' ');\nconst title = raw.match(/^#\\s+(.+)$/m)?.[1] || source.source_url;\nreturn [{json:{source_url:source.source_url,title,tone:source.tone,content}}];"
+        "jsCode": "const fallback=$('Validate Request').first().json;\nconst source=$json.source_url ? $json : fallback;\nconst raw=typeof $json.content==='string'\n  ? $json.content\n  : (typeof $json.data==='string' ? $json.data : JSON.stringify($json));\nconst words=raw.split(/\\s+/).filter(Boolean);\nconst content=words.slice(0,12000).join(' ');\nconst title=$json.title || raw.match(/^#\\s+(.+)$/m)?.[1] || source.source_url;\nreturn [{json:{source_url:source.source_url,title,tone:source.tone,content}}];"
       },
       "id": "5",
       "name": "Normalize & Limit",
@@ -176,18 +176,33 @@
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { error: 'YouTube transcript support is not enabled yet', source_url: $json.body?.url || null } }}",
-        "options": {
-          "responseCode": 501
-        }
+        "jsCode": "const body=$json.body ?? {};\nconst url=body.url;\nif(!url || typeof url!=='string') throw new Error('A valid YouTube URL is required.');\ntry {\n  const u=new URL(url);\n  if(!['http:','https:'].includes(u.protocol)) throw new Error();\n  const host=u.hostname.toLowerCase();\n  if(!(host==='youtube.com'||host.endsWith('.youtube.com')||host==='youtu.be'||host.endsWith('.youtu.be'))) throw new Error();\n} catch {\n  throw new Error('Invalid YouTube URL.');\n}\nconst tone=['professional','casual','technical'].includes(body.tone) ? body.tone : 'professional';\nreturn [{json:{source_url:url,tone}}];"
       },
-      "id": "10",
-      "name": "YouTube - Phase 2",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.4,
+      "id": "11",
+      "name": "Validate YouTube Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         -450,
+        -150
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://transcript-service:8000/transcript",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: $json.source_url }) }}",
+        "options": {}
+      },
+      "id": "12",
+      "name": "Fetch YouTube Transcript",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -200,
         -150
       ]
     }
@@ -208,7 +223,7 @@
       "main": [
         [
           {
-            "node": "YouTube - Phase 2",
+            "node": "Validate YouTube Request",
             "type": "main",
             "index": 0
           }
@@ -282,6 +297,28 @@
         [
           {
             "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate YouTube Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch YouTube Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch YouTube Transcript": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Limit",
             "type": "main",
             "index": 0
           }
