@@ -1,17 +1,64 @@
 # Architecture
 
-## Phase 1
+## Phase 1 + Phase 2
 
-Webhook -> URL validation -> blog extraction through Jina AI -> normalization/content limit -> LLM generation -> structured output validation -> webhook response.
+The workflow accepts one source URL and routes it by source type.
 
-## Phase 2
+```text
+Webhook
+   |
+   v
+YouTube?
+   | yes                         | no
+   v                             v
+Validate YouTube URL       Validate Request
+   |                             |
+   v                             v
+Transcript Service          Jina AI Extraction
+   |                             |
+   +-------------+---------------+
+                 |
+                 v
+          Normalize + 12k-word limit
+                 |
+                 v
+            LLM generation
+                 |
+                 v
+          Output validation
+                 |
+                 v
+          Webhook response
+```
 
-Add a self-hosted Python transcript service using youtube-transcript-api. The YouTube branch will normalize transcript data into the same source_url, title, and content contract used by the blog branch.
+## Transcript service
 
-## Design principles
+The self-hosted service lives in `transcript-service/` and exposes:
 
-- Keep source extraction separate from generation.
-- Normalize all sources into one internal schema.
-- Validate generated social content before returning it.
-- Keep secrets out of Git.
-- Add explicit error responses as the workflow matures.
+- `GET /health`
+- `POST /transcript`
+
+It extracts a YouTube video ID, requests the available transcript through `youtube-transcript-api`, joins transcript snippets into plain text, and returns:
+
+```json
+{
+  "source_url": "https://www.youtube.com/watch?v=...",
+  "title": "YouTube video ...",
+  "content": "..."
+}
+```
+
+The n8n container reaches it through the Docker service name:
+
+```text
+http://transcript-service:8000/transcript
+```
+
+## Reliability boundaries
+
+- Validate URLs before extraction.
+- Reject unsupported source URLs.
+- Return an explicit error when a transcript is unavailable.
+- Cap source material at 12,000 words before the LLM.
+- Require JSON-shaped LLM output.
+- Reject X/Twitter posts longer than 280 characters.
