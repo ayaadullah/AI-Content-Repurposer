@@ -194,7 +194,7 @@
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ url: $json.source_url }) }}",
+        "jsonBody": "={{ JSON.stringify({ url: $json.source_url, tone: $json.tone }) }}",
         "options": {}
       },
       "id": "12",
