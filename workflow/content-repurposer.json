@@ -12,10 +12,7 @@
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        -900,
-        0
-      ]
+      "position": [-900, 0]
     },
     {
       "parameters": {
@@ -29,18 +26,12 @@
             {
               "leftValue": "={{ $json.body.url }}",
               "rightValue": "youtube.com",
-              "operator": {
-                "type": "string",
-                "operation": "contains"
-              }
+              "operator": {"type": "string", "operation": "contains"}
             },
             {
               "leftValue": "={{ $json.body.url }}",
               "rightValue": "youtu.be",
-              "operator": {
-                "type": "string",
-                "operation": "contains"
-              }
+              "operator": {"type": "string", "operation": "contains"}
             }
           ],
           "combinator": "or"
@@ -50,10 +41,7 @@
       "name": "YouTube?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [
-        -680,
-        0
-      ]
+      "position": [-680, 0]
     },
     {
       "parameters": {
@@ -63,19 +51,14 @@
       "name": "Validate Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -450,
-        150
-      ]
+      "position": [-450, 150]
     },
     {
       "parameters": {
         "url": "=https://r.jina.ai/{{$json.source_url}}",
         "options": {
           "response": {
-            "response": {
-              "responseFormat": "text"
-            }
+            "response": {"responseFormat": "text"}
           }
         }
       },
@@ -83,23 +66,17 @@
       "name": "Fetch Article (Jina)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -220,
-        150
-      ]
+      "position": [-220, 150]
     },
     {
       "parameters": {
-        "jsCode": "const fallback=$('Validate Request').first().json;\nconst source=$json.source_url ? $json : fallback;\nconst raw=typeof $json.content==='string'\n  ? $json.content\n  : (typeof $json.data==='string' ? $json.data : JSON.stringify($json));\nconst words=raw.split(/\\s+/).filter(Boolean);\nconst content=words.slice(0,12000).join(' ');\nconst title=$json.title || raw.match(/^#\\s+(.+)$/m)?.[1] || source.source_url;\nreturn [{json:{source_url:source.source_url,title,tone:source.tone,content}}];"
+        "jsCode": "let request = {};\ntry { request = $('Validate Request').first().json; } catch {}\nconst source = $json.source_url ? $json : request;\nconst source_url = source.source_url;\nconst tone = source.tone ?? 'professional';\nconst raw = typeof $json.content === 'string' ? $json.content : (typeof $json.data === 'string' ? $json.data : JSON.stringify($json));\nconst words = raw.split(/\\s+/).filter(Boolean);\nconst content = words.slice(0, 12000).join(' ');\nconst title = $json.title || raw.match(/^#\\s+(.+)$/m)?.[1] || source_url;\nreturn [{json:{source_url,title,tone,content}}];"
       },
       "id": "5",
       "name": "Normalize & Limit",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        0,
-        150
-      ]
+      "position": [0, 150]
     },
     {
       "parameters": {
@@ -109,10 +86,7 @@
       "name": "Build LLM Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        220,
-        150
-      ]
+      "position": [220, 150]
     },
     {
       "parameters": {
@@ -121,14 +95,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
+            {"name": "Authorization", "value": "=Bearer {{$env.OPENAI_API_KEY}}"},
+            {"name": "Content-Type", "value": "application/json"}
           ]
         },
         "sendBody": true,
@@ -141,10 +109,7 @@
       "name": "LLM - OpenAI",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        450,
-        150
-      ]
+      "position": [450, 150]
     },
     {
       "parameters": {
@@ -154,10 +119,7 @@
       "name": "Validate Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        680,
-        150
-      ]
+      "position": [680, 150]
     },
     {
       "parameters": {
@@ -169,23 +131,17 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [
-        910,
-        150
-      ]
+      "position": [910, 150]
     },
     {
       "parameters": {
-        "jsCode": "const body=$json.body ?? {};\nconst url=body.url;\nif(!url || typeof url!=='string') throw new Error('A valid YouTube URL is required.');\ntry {\n  const u=new URL(url);\n  if(!['http:','https:'].includes(u.protocol)) throw new Error();\n  const host=u.hostname.toLowerCase();\n  if(!(host==='youtube.com'||host.endsWith('.youtube.com')||host==='youtu.be'||host.endsWith('.youtu.be'))) throw new Error();\n} catch {\n  throw new Error('Invalid YouTube URL.');\n}\nconst tone=['professional','casual','technical'].includes(body.tone) ? body.tone : 'professional';\nreturn [{json:{source_url:url,tone}}];"
+        "jsCode": "const body=$json.body ?? {};\nconst url=body.url;\nif(!url || typeof url!=='string') throw new Error('A valid YouTube URL is required.');\ntry { const u=new URL(url); if(!['http:','https:'].includes(u.protocol)) throw new Error(); const host=u.hostname.toLowerCase(); if(!(host==='youtube.com'||host.endsWith('.youtube.com')||host==='youtu.be'||host.endsWith('.youtu.be'))) throw new Error(); } catch { throw new Error('Invalid YouTube URL.'); }\nconst tone=['professional','casual','technical'].includes(body.tone) ? body.tone : 'professional';\nreturn [{json:{source_url:url,tone}}];"
       },
       "id": "11",
       "name": "Validate YouTube Request",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -450,
-        -150
-      ]
+      "position": [-450, -150]
     },
     {
       "parameters": {
@@ -201,135 +157,26 @@
       "name": "Fetch YouTube Transcript",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -200,
-        -150
-      ]
+      "position": [-200, -150]
     }
   ],
   "connections": {
-    "Webhook": {
-      "main": [
-        [
-          {
-            "node": "YouTube?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "YouTube?": {
-      "main": [
-        [
-          {
-            "node": "Validate YouTube Request",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Validate Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate Request": {
-      "main": [
-        [
-          {
-            "node": "Fetch Article (Jina)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch Article (Jina)": {
-      "main": [
-        [
-          {
-            "node": "Normalize & Limit",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Normalize & Limit": {
-      "main": [
-        [
-          {
-            "node": "Build LLM Prompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Build LLM Prompt": {
-      "main": [
-        [
-          {
-            "node": "LLM - OpenAI",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "LLM - OpenAI": {
-      "main": [
-        [
-          {
-            "node": "Validate Output",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate Output": {
-      "main": [
-        [
-          {
-            "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Validate YouTube Request": {
-      "main": [
-        [
-          {
-            "node": "Fetch YouTube Transcript",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Fetch YouTube Transcript": {
-      "main": [
-        [
-          {
-            "node": "Normalize & Limit",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Webhook": {"main": [[{"node":"YouTube?","type":"main","index":0}]]},
+    "YouTube?": {"main": [
+      [{"node":"Validate YouTube Request","type":"main","index":0}],
+      [{"node":"Validate Request","type":"main","index":0}]
+    ]},
+    "Validate Request": {"main": [[{"node":"Fetch Article (Jina)","type":"main","index":0}]]},
+    "Fetch Article (Jina)": {"main": [[{"node":"Normalize & Limit","type":"main","index":0}]]},
+    "Normalize & Limit": {"main": [[{"node":"Build LLM Prompt","type":"main","index":0}]]},
+    "Build LLM Prompt": {"main": [[{"node":"LLM - OpenAI","type":"main","index":0}]]},
+    "LLM - OpenAI": {"main": [[{"node":"Validate Output","type":"main","index":0}]]},
+    "Validate Output": {"main": [[{"node":"Respond to Webhook","type":"main","index":0}]]},
+    "Validate YouTube Request": {"main": [[{"node":"Fetch YouTube Transcript","type":"main","index":0}]]},
+    "Fetch YouTube Transcript": {"main": [[{"node":"Normalize & Limit","type":"main","index":0}]]}
   },
   "pinData": {},
   "active": false,
-  "settings": {
-    "executionOrder": "v1"
-  },
+  "settings": {"executionOrder":"v1"},
   "tags": []
 }
