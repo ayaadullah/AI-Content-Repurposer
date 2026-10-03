@@ -1,0 +1,298 @@
+{
+  "name": "AI Content Repurposer - Phase 1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "content-repurposer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body.url }}",
+              "rightValue": "youtube.com",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.body.url }}",
+              "rightValue": "youtu.be",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "2",
+      "name": "YouTube?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? {};\nconst url = body.url;\nif (!url || typeof url !== 'string') throw new Error('A valid URL is required.');\ntry { const u = new URL(url); if (!['http:','https:'].includes(u.protocol)) throw new Error(); } catch { throw new Error('Invalid URL.'); }\nconst tone = ['professional','casual','technical'].includes(body.tone) ? body.tone : 'professional';\nreturn [{json:{source_url:url,tone}}];"
+      },
+      "id": "3",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -450,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://r.jina.ai/{{$json.source_url}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "4",
+      "name": "Fetch Article (Jina)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -220,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Validate Request').first().json;\nconst raw = typeof $json.data === 'string' ? $json.data : JSON.stringify($json);\nconst words = raw.split(/\\s+/).filter(Boolean);\nconst content = words.slice(0,12000).join(' ');\nconst title = raw.match(/^#\\s+(.+)$/m)?.[1] || source.source_url;\nreturn [{json:{source_url:source.source_url,title,tone:source.tone,content}}];"
+      },
+      "id": "5",
+      "name": "Normalize & Limit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const x=$json;\nconst system='You are an expert content repurposing assistant. Return only valid JSON matching the requested schema. Never invent facts. Tone: '+x.tone+'.';\nconst user='Source title: '+x.title+'\\nURL: '+x.source_url+'\\n\\nCreate: 1) a concise summary, 2) a useful LinkedIn post with a strong natural hook, 3) an X/Twitter thread where every item is <=280 characters.\\n\\nSOURCE:\\n'+x.content;\nreturn [{json:{...x,system,user}}];"
+      },
+      "id": "6",
+      "name": "Build LLM Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({model: $env.OPENAI_MODEL || 'gpt-4o-mini', temperature: 0.4, messages: [{role:'system',content:$json.system},{role:'user',content:$json.user}], response_format:{type:'json_object'}}) }}",
+        "options": {}
+      },
+      "id": "7",
+      "name": "LLM - OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        450,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw=$json.choices?.[0]?.message?.content;\nif(!raw) throw new Error('LLM returned no content.');\nlet out; try { out=JSON.parse(raw); } catch { throw new Error('LLM returned invalid JSON.'); }\nif(typeof out.summary!=='string'||typeof out.linkedin_post!=='string'||!Array.isArray(out.tweet_thread)) throw new Error('LLM output does not match the required schema.');\nconst invalid=out.tweet_thread.filter(x=>typeof x!=='string'||x.length>280);\nif(invalid.length) throw new Error('Tweet thread contains posts over 280 characters.');\nreturn [{json:{summary:out.summary,linkedin_post:out.linkedin_post,tweet_thread:out.tweet_thread}}];"
+      },
+      "id": "8",
+      "name": "Validate Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "9",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        910,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'YouTube transcript support is not enabled yet', source_url: $json.body?.url || null } }}",
+        "options": {
+          "responseCode": 501
+        }
+      },
+      "id": "10",
+      "name": "YouTube - Phase 2",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -450,
+        -150
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "YouTube?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YouTube?": {
+      "main": [
+        [
+          {
+            "node": "YouTube - Phase 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Article (Jina)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Article (Jina)": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Limit": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM - OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM - OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Validate Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
