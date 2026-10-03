@@ -10,6 +10,7 @@ app = FastAPI(title="AI Content Repurposer Transcript Service", version="1.0.0")
 
 class TranscriptRequest(BaseModel):
     url: HttpUrl
+    tone: str = "professional"
 
 
 def extract_video_id(url: str) -> str:
@@ -70,5 +71,6 @@ def transcript(request: TranscriptRequest):
     return {
         "source_url": source_url,
         "title": f"YouTube video {video_id}",
+        "tone": request.tone if request.tone in {"professional", "casual", "technical"} else "professional",
         "content": content,
     }
